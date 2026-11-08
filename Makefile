@@ -5,6 +5,7 @@ LDFLAGS ?= -shared
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 TARGET_LIB = $(BUILD_DIR)/libcent_runtime.so
+TEST_BIN = $(BUILD_DIR)/testbench_core
 
 SRCS = src/topology.cpp \
        src/sram_buffer.cpp \
@@ -20,12 +21,12 @@ HEADERS = include/cent/isa.h \
           include/cent/sram_buffer.hpp \
           include/cent/isa_emitter.hpp
 
-.PHONY: all shared test demo simulate clean help
+.PHONY: all shared test-core demo simulate clean help
 
 help:
 	@echo "cent_runtime - Available Make targets:"
 	@echo "  make (or make shared) - Build build/libcent_runtime.so"
-	@echo "  make test             - Run test suite via unittest"
+	@echo "  make test-core        - Run native C++ testbench suite"
 	@echo "  make demo             - Run Llama-2 7B attention & MLP demo"
 	@echo "  make simulate         - Run demo with Ramulator 2.0 cycle simulation"
 	@echo "  make clean            - Remove build artifacts, traces, and python cache"
@@ -43,8 +44,12 @@ $(OBJ_DIR)/%.o: src/%.cpp $(HEADERS)
 	@mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-test: shared
-	PYTHONPATH=python python3 -m unittest discover -s tests -v
+test-core: shared $(TEST_BIN)
+	./$(TEST_BIN)
+
+$(TEST_BIN): tests/testbench_core.cpp $(HEADERS) $(TARGET_LIB)
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -L$(BUILD_DIR) -Wl,-rpath,'$$ORIGIN' $< -lcent_runtime -o $@
 
 demo: shared
 	PYTHONPATH=python python3 examples/llama2_7b_demo.py
