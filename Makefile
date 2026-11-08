@@ -21,12 +21,13 @@ HEADERS = include/cent/isa.h \
           include/cent/sram_buffer.hpp \
           include/cent/isa_emitter.hpp
 
-.PHONY: all shared test-core demo simulate clean help
+.PHONY: all shared test-core test demo simulate clean help
 
 help:
 	@echo "cent_runtime - Available Make targets:"
 	@echo "  make (or make shared) - Build build/libcent_runtime.so"
 	@echo "  make test-core        - Run native C++ testbench suite"
+	@echo "  make test             - Run Python test suite via unittest"
 	@echo "  make demo             - Run Llama-2 7B attention & MLP demo"
 	@echo "  make simulate         - Run demo with Ramulator 2.0 cycle simulation"
 	@echo "  make clean            - Remove build artifacts, traces, and python cache"
@@ -50,6 +51,9 @@ test-core: shared $(TEST_BIN)
 $(TEST_BIN): tests/testbench_core.cpp $(HEADERS) $(TARGET_LIB)
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -L$(BUILD_DIR) -Wl,-rpath,'$$ORIGIN' $< -lcent_runtime -o $@
+
+test: shared
+	PYTHONPATH=python python3 -m unittest discover -s tests -v
 
 demo: shared
 	PYTHONPATH=python python3 examples/llama2_7b_demo.py
