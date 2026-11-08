@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cent_runtime"
+version = "0.1.0"
+description = "Hardware runtime and dispatch library for the CENT PIM architecture (ASPLOS 2025)"
+authors = [
+    { name = "José Dercy Vieira da Silva Filho" }
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20.0"
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.0.0"]
+dev = ["pytest>=7.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["python"]
