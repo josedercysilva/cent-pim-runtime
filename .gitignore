@@ -1,0 +1,38 @@
+# Build artifacts (C/C++)
+build/
+*.so
+*.o
+*.a
+*.d
+*.out
+
+# CENT ISA simulator traces
+*.trace
+traces/
+
+# Python / Packaging
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Local workspace docs & agent rules
+GEMINI.md
+AGENTS.md
+.agents/
+.agent/
+*.pdf
+notas/
+
+# IDEs & OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
