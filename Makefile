@@ -21,10 +21,12 @@ HEADERS = include/cent/isa.h \
           include/cent/sram_buffer.hpp \
           include/cent/isa_emitter.hpp
 
-.PHONY: all shared test-core test demo simulate clean help
+.PHONY: all shared test-core test demo simulate clean help setup-env venv-clean
 
 help:
 	@echo "cent_runtime - Available Make targets:"
+	@echo "  make setup-env        - Create .venv and install PyTorch CPU + cent_runtime"
+	@echo "  make venv-clean       - Remove .venv virtual environment and egg-info"
 	@echo "  make (or make shared) - Build build/libcent_runtime.so"
 	@echo "  make test-core        - Run native C++ testbench suite"
 	@echo "  make test             - Run Python test suite via unittest"
@@ -66,3 +68,9 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.trace" -delete
+
+setup-env:
+	./setup_env.sh
+
+venv-clean:
+	rm -rf .venv python/*.egg-info *.egg-info
