@@ -6,9 +6,10 @@ build/
 *.d
 *.out
 
-# CENT ISA simulator traces
+# CENT ISA simulator traces & external binaries
 *.trace
 traces/
+external/ramulator2
 
 # Python / Packaging
 __pycache__/
