@@ -65,4 +65,4 @@ clean:
 	rm -rf $(BUILD_DIR)
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
-	rm -f *.trace
+	find . -type f -name "*.trace" -delete

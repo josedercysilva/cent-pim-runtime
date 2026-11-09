@@ -224,6 +224,27 @@ class TestCentRuntime(unittest.TestCase):
             if os.path.exists(trace_path):
                 os.remove(trace_path)
 
+    def test_save_trace_flag(self):
+        """Valida que save_trace=True gera cent_layer_{layer_id}.trace automaticamente."""
+        expected_file = "cent_layer_3.trace"
+        if os.path.exists(expected_file):
+            os.remove(expected_file)
+
+        try:
+            x = np.ones((1024,), dtype=np.float32)
+            W = np.ones((16, 1024), dtype=np.float32)
+            _, telem = cent_runtime.matmul(x, W, layer_id=3, save_trace=True)
+
+            self.assertTrue(os.path.exists(expected_file))
+            self.assertEqual(telem.get("trace_path"), expected_file)
+            with open(expected_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertTrue("AiM WR_GB" in content)
+            self.assertTrue("AiM EOC" in content)
+        finally:
+            if os.path.exists(expected_file):
+                os.remove(expected_file)
+
     def test_simulator_output_parser_mock(self):
         """Valida o parser estruturado de estatísticas com saída simulada do Ramulator 2.0."""
         mock_output = """

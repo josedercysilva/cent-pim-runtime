@@ -38,6 +38,7 @@ def matmul(
     W: Any,
     layer_id: int = 0,
     trace_path: Optional[str] = None,
+    save_trace: bool = False,
     simulate: bool = False,
     ramulator_bin: Optional[str] = None,
     config_path: Optional[str] = None,
@@ -53,9 +54,9 @@ def matmul(
            de formato 2D (M, K) em ordem row-major.
         layer_id: Índice da camada Transformer (utilizado para rotear o DVid
                   no switch CXL entre as 32 placas disponíveis).
-        trace_path: Caminho opcional para salvar o arquivo de traço (.trace)
-                    compatível com o simulador Ramulator 2.0. Se None e simulate=False,
-                    nenhum arquivo é gerado em disco.
+        trace_path: Caminho customizado opcional para salvar o arquivo de traço (.trace).
+        save_trace: Se True (ou se CENT_SAVE_TRACE=1 no ambiente), salva automaticamente
+                    o arquivo de traço como 'cent_layer_{layer_id}.trace' no diretório atual.
         simulate: Se True, sintetiza o traço CENT ISA e dispara o simulador
                   Ramulator 2.0 de ciclo exato para extrair estatísticas de hardware.
         ramulator_bin: Caminho opcional para o executável do Ramulator 2.0.
@@ -138,10 +139,17 @@ def matmul(
     W_contig = np.ascontiguousarray(W_np, dtype=np.float32)
     y_np = np.empty((m_dim,), dtype=np.float32)
 
-    # Gerenciamento de arquivo .trace temporário se simulação for solicitada
-    temp_trace_path: Optional[str] = None
-    target_trace_path = trace_path
+    # -------------------------------------------------------------------------
+    # Gerenciamento de arquivo .trace (automático via save_trace ou temporário para simulate)
+    # -------------------------------------------------------------------------
+    env_save_trace = os.environ.get("CENT_SAVE_TRACE", "").lower() in ("1", "true", "yes")
+    should_save_trace = save_trace or env_save_trace
 
+    target_trace_path = trace_path
+    if should_save_trace and not target_trace_path:
+        target_trace_path = f"cent_layer_{layer_id}.trace"
+
+    temp_trace_path: Optional[str] = None
     if simulate and not target_trace_path:
         with tempfile.NamedTemporaryFile(suffix=".trace", delete=False) as tmp:
             temp_trace_path = tmp.name
@@ -172,6 +180,9 @@ def matmul(
             raise RuntimeError(f"cent_dispatch_gemv falhou na C ABI com código de erro {status}")
 
         telemetry = telem_c.to_dict()
+
+        if target_trace_path and not temp_trace_path:
+            telemetry["trace_path"] = target_trace_path
 
         if simulate and target_trace_path:
             sim_stats = simulate_on_ramulator(

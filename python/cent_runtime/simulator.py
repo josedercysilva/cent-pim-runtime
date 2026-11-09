@@ -21,8 +21,9 @@ def resolve_ramulator_bin(ramulator_bin: Optional[str] = None) -> Path:
     a seguinte ordem de prioridade portátil:
       1. Argumento explícito 'ramulator_bin';
       2. Variável de ambiente 'CENT_RAMULATOR_BIN';
-      3. Caminho relativo irmão: <repo_root>/../CENT/aim_simulator/build/ramulator2;
-      4. Busca no PATH do sistema operacional (shutil.which).
+      3. Diretório local do repositório: <repo_root>/external/ramulator2;
+      4. Caminho relativo irmão: <repo_root>/../CENT/aim_simulator/build/ramulator2;
+      5. Busca no PATH do sistema operacional (shutil.which).
     """
     if ramulator_bin:
         path = Path(ramulator_bin).expanduser().resolve()
@@ -38,6 +39,14 @@ def resolve_ramulator_bin(ramulator_bin: Optional[str] = None) -> Path:
         raise FileNotFoundError(f"Variável CENT_RAMULATOR_BIN aponta para executável inválido: {env_bin}")
 
     repo_root = _find_repo_root()
+
+    # 1. Prioridade local: diretório external/ (ou simulador/) na raiz do repositório
+    for dirname in ["external", "simulador"]:
+        local_sim_path = (repo_root / dirname / "ramulator2").resolve()
+        if local_sim_path.is_file() and os.access(local_sim_path, os.X_OK):
+            return local_sim_path
+
+    # 2. Caminho relativo irmão ao repositório
     sibling_path = (repo_root.parent / "CENT" / "aim_simulator" / "build" / "ramulator2").resolve()
     if sibling_path.is_file() and os.access(sibling_path, os.X_OK):
         return sibling_path
@@ -48,8 +57,9 @@ def resolve_ramulator_bin(ramulator_bin: Optional[str] = None) -> Path:
 
     raise FileNotFoundError(
         "Binário do Ramulator 2.0 (ramulator2) não foi encontrado. "
-        "Especifique via argumento 'ramulator_bin', configure a variável "
-        "de ambiente 'CENT_RAMULATOR_BIN', ou compile em ../CENT/aim_simulator/build/ramulator2."
+        "Coloque em external/ramulator2, especifique via argumento 'ramulator_bin', "
+        "configure a variável de ambiente 'CENT_RAMULATOR_BIN', ou compile em "
+        "../CENT/aim_simulator/build/ramulator2."
     )
 
 
@@ -84,13 +94,17 @@ def resolve_config_path(config_path: Optional[str] = None) -> Path:
 def parse_simulator_output(stdout_text: str) -> Dict[str, Any]:
     """
     Faz o parse estruturado da saída textual padrão do Ramulator 2.0.
-    Ignora linhas de comentários (#) e converte pares chave: valor numéricos.
+    Ignora linhas de comentários (#), remove comentários inline e converte
+    pares chave: valor numéricos.
     """
     parsed: Dict[str, Any] = {}
     for raw_line in stdout_text.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
+        # Remove comentário inline (ex: "96  # total number of cycles")
+        if "#" in line:
+            line = line.split("#", 1)[0].strip()
         if ":" in line:
             parts = line.split(":", 1)
             key = parts[0].strip()
@@ -136,10 +150,17 @@ def simulate_on_ramulator(
     bin_path = resolve_ramulator_bin(ramulator_bin)
     cfg_path = resolve_config_path(config_path)
 
+    # Configura o ambiente de execução garantindo que libramulator.so seja localizada
+    env = dict(os.environ)
+    bin_dir = str(bin_path.parent)
+    cur_ld = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = f"{bin_dir}:{cur_ld}" if cur_ld else bin_dir
+
     cmd = [str(bin_path), "-f", str(cfg_path), "-t", str(trace_file)]
     try:
         proc = subprocess.run(
             cmd,
+            env=env,
             check=True,
             capture_output=True,
             text=True,
