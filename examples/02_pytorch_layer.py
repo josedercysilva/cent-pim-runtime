@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
-"""
-Exemplo 02: Integração com PyTorch (Camada Linear PIM + Não-Linearidade no Host)
-Demonstra a divisão arquitetural do CENT (Gu et al., ASPLOS 2025):
-  - Multiplicação linear densa (GEMV): Descarregada para o Near-Bank PIM (cent_runtime)
-  - Ativação não-linear (SiLU / ReLU): Executada no Host CPU (PyTorch nativo)
-"""
 
 from pathlib import Path
 import sys
 import numpy as np
 
-# Permite executar diretamente a partir do repositório
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root / "python"))
 
@@ -26,14 +19,11 @@ except ImportError:
 print("=== cent_runtime: Integração PyTorch + Near-Bank PIM ===\n")
 
 if HAS_TORCH:
-    # 1. Cria tensores PyTorch nativos (fase de Decoding, batch_size = 1)
-    x = torch.randn(1, 2048)            # Vetor de ativação do token
-    W = torch.randn(2048, 2048)         # Matriz de pesos da projeção
+    x = torch.randn(1, 2048)
+    W = torch.randn(2048, 2048)
 
-    # 2. GEMV descarregada para o Near-Bank PIM via cent_runtime salvando o traço
     y, telem = cent_runtime.matmul(x, W, layer_id=0, save_trace=True)
 
-    # 3. Operação não-linear continua transparentemente no PyTorch (Host CPU / PNM)
     out = F.silu(y)
 
     print(f"  • Arquivo .trace gerado     : {telem.get('trace_path')}")
@@ -43,12 +33,11 @@ if HAS_TORCH:
     print(f"  • Economia de Tráfego CXL   : {telem['memory_traffic_saved_pct']:.2f}%")
 
 else:
-    # Fallback transparente com NumPy caso PyTorch não esteja instalado
     x = np.random.randn(1, 2048).astype(np.float32)
     W = np.random.randn(2048, 2048).astype(np.float32)
 
     y, telem = cent_runtime.matmul(x, W, layer_id=0, save_trace=True)
-    out = np.maximum(y, 0)  # ReLU executada na CPU
+    out = np.maximum(y, 0)
 
     print("PyTorch não detectado no ambiente global. Executando via NumPy (Fallback):")
     print(f"  • Arquivo .trace gerado     : {telem.get('trace_path')}")
