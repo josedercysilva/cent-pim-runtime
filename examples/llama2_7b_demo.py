@@ -1,36 +1,13 @@
-#!/usr/bin/env python3
-"""
-Demonstração e Validação Microarquitetural do Llama-2 7B — cent_runtime
-Autor: José Dercy Vieira da Silva Filho
-Instituição: UFAM — FEEC — Arquitetura de Computadores (Prof. Thiago Bezerra)
-Artigo Base: Gu et al., ASPLOS 2025 (PIM Is All You Need / CENT Architecture)
-
-Este script valida rigorosamente as projeções lineares densas do Llama-2 7B
-durante a fase de Decoding (batch_size = 1) no acelerador Near-Bank PIM:
-  1. Camada de Atenção (4096 x 4096, layer_id = 0)
-  2. Camada MLP / Feed-Forward (11008 x 4096, layer_id = 1)
-
-Divisão Arquitetural:
-  - Descarregado para CENT Near-Bank PIM (GDDR6-AiM via CXL 3.0):
-      Multiplicações Vetor-Matriz (GEMV) das projeções densas (q_proj, k_proj,
-      v_proj, o_proj, gate_proj, up_proj, down_proj), responsáveis por >99%
-      da movimentação de pesos de LLMs.
-  - Mantido no Host CPU / PNM (Dispatcher nativo do PyTorch):
-      Operações não-lineares, normalizações e reduções (Softmax, RMSNorm,
-      SiLU, RoPE), além da fase de Prefill (GEMM, batch > 1) e autograd.
-"""
-
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 
-# Adiciona o diretório python/ ao sys.path para importação direta
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root / "python"))
 
-import cent_runtime  # noqa: E402
+import cent_runtime
 
 try:
     import torch
@@ -39,11 +16,10 @@ except ImportError:
     torch = None
     _HAS_TORCH = False
 
-import numpy as np  # noqa: E402
+import numpy as np
 
 
 def format_bytes(num_bytes: float) -> str:
-    """Formata valores em bytes para KB ou MB de forma humanamente legível."""
     if num_bytes >= 1024 * 1024:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
     if num_bytes >= 1024:
@@ -74,13 +50,11 @@ def run_layer_demo(
     simulate: bool = False,
     trace_path: str | None = None,
 ) -> dict:
-    """Executa e valida uma camada Transformer densa do Llama-2 7B."""
     print(f"▶ Executando Camada: {layer_name}")
     print(f"  Dimensões de Pesos W : [{M} x {K}] (Dimensão de Saída x Dimensão Oculta)")
     print(f"  Formato da Ativação x: [1 x {K}] (Vetor de Decoding, batch_size = 1)")
     print(f"  Índice da Camada     : layer_id = {layer_id}")
 
-    # Criação dos tensores de ativação e pesos
     if _HAS_TORCH:
         x = torch.randn(1, K, dtype=torch.float32)
         W = torch.randn(M, K, dtype=torch.float32)
@@ -111,7 +85,6 @@ def run_layer_demo(
         else:
             raise
 
-    # Exibição dos resultados de telemetria de hardware
     dvid = telem["dvid"]
     ch_mask = telem["channel_mask_hex"]
     total_inst = telem["total_instructions"]
@@ -164,7 +137,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Define caminhos padrão dos arquivos .trace no mesmo diretório do script
     script_dir = Path(__file__).resolve().parent
     if args.trace_path:
         base_trace = Path(args.trace_path)
@@ -183,7 +155,6 @@ def main() -> None:
 
     print_header()
 
-    # 1. Camada de Atenção Llama-2 7B (4096 x 4096, layer_id = 0)
     telem_attn = run_layer_demo(
         layer_name="Llama-2 7B — Camada de Atenção (q/k/v/o proj)",
         M=4096,
@@ -193,7 +164,6 @@ def main() -> None:
         trace_path=attn_trace,
     )
 
-    # 2. Camada MLP / Feed-Forward Llama-2 7B (11008 x 4096, layer_id = 1)
     telem_mlp = run_layer_demo(
         layer_name="Llama-2 7B — Camada MLP / Feed-Forward (gate/up/down proj)",
         M=11008,
@@ -203,14 +173,12 @@ def main() -> None:
         trace_path=mlp_trace,
     )
 
-    # 3. Hex Dump dos Primeiros 64 Bytes da SRAM
     print("▶ Dump Hexadecimal do Instruction Buffer SRAM de 2 MB (Primeiros 64 Bytes):")
     hex_dump = cent_runtime.get_instruction_buffer_hex(max_len=512)
     for line in hex_dump.splitlines()[:4]:
         print(f"  [SRAM] {line}")
     print("  (Opcode 0x02 = WR_GB, Opcode 0x03 = WR_BIAS, Opcode 0x0F = MAC_ABK)\n")
 
-    # 4. Auditoria Rigorosa dos Resultados
     print("=" * 78)
     print("  Conferência Rigorosa contra Métricas Auditadas (ASPLOS 2025):")
     print("=" * 78)
