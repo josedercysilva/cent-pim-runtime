@@ -29,6 +29,7 @@ AGENTS.md
 .agents/
 .agent/
 *.pdf
+!apresentacao_cent.pdf
 notas/
 
 # IDEs & OS
